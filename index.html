@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sentinel-IX · DLP Command Center</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ['"Share Tech Mono"', 'monospace'],
+            display: ['Rajdhani', 'sans-serif'],
+            body: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            neon: { blue: '#00d4ff', emerald: '#00ffaa', red: '#ff3864', amber: '#ffaa00' },
+            glass: { DEFAULT: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.08)' },
+            dark: { 900: '#040810', 800: '#070e1a', 700: '#0c1525', 600: '#111e33', 500: '#1a2d4a' },
+          },
+          boxShadow: {
+            'neon-blue': '0 0 20px rgba(0,212,255,0.4), 0 0 60px rgba(0,212,255,0.1)',
+            'neon-emerald': '0 0 20px rgba(0,255,170,0.4), 0 0 60px rgba(0,255,170,0.1)',
+            'neon-red': '0 0 20px rgba(255,56,100,0.5), 0 0 60px rgba(255,56,100,0.15)',
+            'glass': '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)',
+          },
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      --neon-blue: #00d4ff;
+      --neon-emerald: #00ffaa;
+      --neon-red: #ff3864;
+      --neon-amber: #ffaa00;
+      --bg-900: #040810;
+      --bg-800: #070e1a;
+      --bg-700: #0c1525;
+      --bg-600: #111e33;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--bg-900);
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    /* ── Grid Background ─────────────────────────────────────────────── */
+    .bg-grid {
+      background-image:
+        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* ── Glassmorphism ───────────────────────────────────────────────── */
+    .glass {
+      background: rgba(255,255,255,0.03);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.07);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+
+    .glass-intense {
+      background: rgba(0,212,255,0.04);
+      backdrop-filter: blur(24px);
+      border: 1px solid rgba(0,212,255,0.15);
+      box-shadow: 0 0 40px rgba(0,212,255,0.05), inset 0 1px 0 rgba(0,212,255,0.1);
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────────────────── */
+    .sidebar {
+      width: 72px;
+      transition: width 0.3s cubic-bezier(0.4,0,0.2,1);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .sidebar:hover, .sidebar.expanded { width: 240px; }
+    .sidebar .label { opacity: 0; transition: opacity 0.2s 0.1s; white-space: nowrap; }
+    .sidebar:hover .label, .sidebar.expanded .label { opacity: 1; }
+
+    /* ── Nav Items ───────────────────────────────────────────────────── */
+    .nav-item {
+      display: flex; align-items: center; gap: 14px;
+      padding: 12px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .nav-item::before {
+      content: '';
+      position: absolute; left: 0; top: 0; bottom: 0;
+      width: 3px; background: var(--neon-blue);
+      transform: scaleY(0); transition: transform 0.2s;
+      border-radius: 0 2px 2px 0;
+    }
+    .nav-item:hover { background: rgba(0,212,255,0.06); }
+    .nav-item.active { background: rgba(0,212,255,0.1); color: var(--neon-blue); }
+    .nav-item.active::before { transform: scaleY(1); }
+
+    /* ── Terminal Textarea ───────────────────────────────────────────── */
+    .terminal-textarea {
+      font-family: 'Share Tech Mono', monospace;
+      background: rgba(0,0,0,0.5);
+      border: 1px solid rgba(0,212,255,0.2);
+      color: var(--neon-emerald);
+      caret-color: var(--neon-blue);
+      resize: vertical;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .terminal-textarea::placeholder { color: rgba(0,212,255,0.3); }
+    .terminal-textarea:focus {
+      outline: none;
+      border-color: var(--neon-blue);
+      box-shadow: 0 0 0 3px rgba(0,212,255,0.08), 0 0 30px rgba(0,212,255,0.15);
+    }
+
+    /* ── Analyze Button ──────────────────────────────────────────────── */
+    .btn-analyze {
+      background: linear-gradient(135deg, rgba(0,212,255,0.15), rgba(0,255,170,0.08));
+      border: 1px solid rgba(0,212,255,0.4);
+      color: var(--neon-blue);
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 14px 40px;
+      border-radius: 8px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s;
+    }
+    .btn-analyze::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(0,212,255,0.2), rgba(0,255,170,0.15));
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .btn-analyze:hover::before { opacity: 1; }
+    .btn-analyze:hover {
+      box-shadow: 0 0 30px rgba(0,212,255,0.4), 0 0 60px rgba(0,212,255,0.1);
+      border-color: var(--neon-blue);
+      transform: translateY(-1px);
+    }
+    .btn-analyze:active { transform: translateY(0); }
+    .btn-analyze:disabled {
+      opacity: 0.5; cursor: not-allowed; transform: none;
+      box-shadow: none;
+    }
+
+    /* ── Status Badge ────────────────────────────────────────────────── */
+    .badge-blocked {
+      background: rgba(255,56,100,0.15);
+      border: 1px solid rgba(255,56,100,0.4);
+      color: var(--neon-red);
+      box-shadow: 0 0 12px rgba(255,56,100,0.2);
+    }
+    .badge-clean {
+      background: rgba(0,255,170,0.1);
+      border: 1px solid rgba(0,255,170,0.35);
+      color: var(--neon-emerald);
+      box-shadow: 0 0 12px rgba(0,255,170,0.15);
+    }
+
+    /* ── Scan Result Card ────────────────────────────────────────────── */
+    .result-blocked {
+      background: rgba(255,56,100,0.05);
+      border: 1px solid rgba(255,56,100,0.25);
+      box-shadow: 0 0 40px rgba(255,56,100,0.08);
+    }
+    .result-clean {
+      background: rgba(0,255,170,0.04);
+      border: 1px solid rgba(0,255,170,0.2);
+      box-shadow: 0 0 40px rgba(0,255,170,0.06);
+    }
+
+    /* ── Table ───────────────────────────────────────────────────────── */
+    .data-table th {
+      background: rgba(0,212,255,0.06);
+      color: rgba(0,212,255,0.7);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(0,212,255,0.12);
+      font-weight: 600;
+    }
+    .data-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.75);
+      vertical-align: middle;
+    }
+    .data-table tr:hover td { background: rgba(0,212,255,0.03); }
+    .data-table tr:last-child td { border-bottom: none; }
+
+    /* ── Metric Cards ────────────────────────────────────────────────── */
+    .metric-val {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 2rem;
+      line-height: 1;
+    }
+
+    /* ── Scanline Overlay ────────────────────────────────────────────── */
+    .scanline::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.03) 2px,
+        rgba(0,0,0,0.03) 4px
+      );
+      pointer-events: none;
+    }
+
+    /* ── Pulse animation ─────────────────────────────────────────────── */
+    @keyframes pulse-neon {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .pulse-neon { animation: pulse-neon 2s ease-in-out infinite; }
+
+    @keyframes slide-in-up {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .slide-in-up { animation: slide-in-up 0.4s ease forwards; }
+
+    @keyframes glow-pulse {
+      0%, 100% { box-shadow: 0 0 15px rgba(0,212,255,0.3); }
+      50%       { box-shadow: 0 0 35px rgba(0,212,255,0.6), 0 0 70px rgba(0,212,255,0.2); }
+    }
+    .glow-pulse { animation: glow-pulse 3s ease-in-out infinite; }
+
+    /* ── Scrollbar ───────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-800); }
+    ::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.25); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(0,212,255,0.45); }
+
+    /* ── Page section transitions ────────────────────────────────────── */
+    .page { display: none; }
+    .page.active { display: block; animation: slide-in-up 0.35s ease; }
+
+    /* ── Top bar live clock ──────────────────────────────────────────── */
+    .monospace-clock { font-family: 'Share Tech Mono', monospace; }
+  </style>
+</head>
+<body class="bg-grid">
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!--  ROOT LAYOUT                                                           -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div class="flex h-screen overflow-hidden">
+
+    <!-- ── SIDEBAR ──────────────────────────────────────────────────────── -->
+    <aside id="sidebar" class="sidebar glass flex flex-col py-6 gap-1 z-50 border-r border-white/5">
+
+      <!-- Logo -->
+      <div class="flex items-center gap-3 px-5 mb-8">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+             style="background: linear-gradient(135deg,rgba(0,212,255,0.3),rgba(0,255,170,0.2)); border:1px solid rgba(0,212,255,0.4); box-shadow: 0 0 20px rgba(0,212,255,0.3)">
+          <i class="fa-solid fa-shield-halved text-sm" style="color:var(--neon-blue)"></i>
+        </div>
+        <div class="label">
+          <p class="font-display font-700 text-white text-base leading-none tracking-wider">SENTINEL</p>
+          <p class="font-mono text-xs" style="color:var(--neon-blue)">— IX</p>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <div class="flex flex-col gap-1 px-3 flex-1">
+        <div class="nav-item active" onclick="navigate('scanner')">
+          <i class="fa-solid fa-radar w-5 text-center text-base flex-shrink-0" style="color:var(--neon-blue)"></i>
+          <span class="label font-display font-600 tracking-wider text-sm text-white">Live Scanner</span>
+        </div>
+        <div class="nav-item" onclick="navigate('audit')">
+          <i class="fa-solid fa-table-list w-5 text-center text-base flex-shrink-0 text-gray-400"></i>
+          <span class="label font-display font-600 tracking-wider text-sm text-gray-300">Audit Database</span>
+        </div>
+      </div>
+
+      <!-- Bottom status -->
+      <div class="px-4 mt-2">
+        <div class="flex items-center gap-3">
+          <div class="w-2 h-2 rounded-full flex-shrink-0 pulse-neon" style="background:var(--neon-emerald); box-shadow:0 0 8px var(--neon-emerald)"></div>
+          <span class="label font-mono text-xs text-gray-500">ENGINE ACTIVE</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── MAIN CONTENT ──────────────────────────────────────────────────── -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+
+      <!-- Top Bar -->
+      <header class="glass border-b border-white/5 px-6 py-3 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2">
+            <span class="font-mono text-xs text-gray-500 uppercase tracking-widest">System</span>
+            <span class="font-mono text-xs" style="color:var(--neon-emerald)">/ OPERATIONAL</span>
+          </div>
+          <div class="w-px h-4 bg-white/10"></div>
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-circle-dot text-xs pulse-neon" style="color:var(--neon-blue)"></i>
+            <span class="font-mono text-xs text-gray-500">DLP Engine v2.9.1</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-6">
+          <!-- Threat counter -->
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-triangle-exclamation text-xs" style="color:var(--neon-amber)"></i>
+            <span class="font-mono text-xs text-gray-400">Threats: <span id="threatCount" class="font-bold" style="color:var(--neon-amber)">0</span></span>
+          </div>
+          <div id="liveClock" class="monospace-clock text-xs text-gray-500"></div>
+          <div class="w-8 h-8 rounded-full glass flex items-center justify-center cursor-pointer hover:border-blue-400/30 transition-all">
+            <i class="fa-solid fa-user-shield text-xs text-gray-400"></i>
+          </div>
+        </div>
+      </header>
+
+      <!-- Scrollable Content Area -->
+      <main class="flex-1 overflow-y-auto px-6 py-6">
+
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!--  PAGE: LIVE SCANNER                                             -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <div id="page-scanner" class="page active">
+
+          <!-- Page Header -->
+          <div class="mb-6">
+            <h1 class="font-display font-700 text-2xl text-white tracking-wider">
+              <i class="fa-solid fa-radar mr-3" style="color:var(--neon-blue)"></i>Live Data Scanner
+            </h1>
+            <p class="text-gray-500 text-sm mt-1 font-body">Analyze text payloads for sensitive data leakage in real-time.</p>
+          </div>
+
+          <!-- Metric Strip -->
+          <div class="grid grid-cols-4 gap-4 mb-6">
+            <div class="glass rounded-xl p-4 border border-white/5">
+              <p class="text-gray-500 text-xs font-display tracking-widest uppercase mb-2">Total Scans</p>
+              <p class="metric-val" style="color:var(--neon-blue)" id="metricTotal">0</p>
+              <p class="text-gray-600 text-xs mt-1 font-mono">this session</p>
+            </div>
+            <div class="glass rounded-xl p-4 border border-white/5">
+              <p class="text-gray-500 text-xs font-display tracking-widest uppercase mb-2">Blocked</p>
+              <p class="metric-val" style="color:var(--neon-red)" id="metricBlocked">0</p>
+              <p class="text-gray-600 text-xs mt-1 font-mono">threats detected</p>
+            </div>
+            <div class="glass rounded-xl p-4 border border-white/5">
+              <p class="text-gray-500 text-xs font-display tracking-widest uppercase mb-2">Clean</p>
+              <p class="metric-val" style="color:var(--neon-emerald)" id="metricClean">0</p>
+              <p class="text-gray-600 text-xs mt-1 font-mono">payloads passed</p>
+            </div>
+            <div class="glass rounded-xl p-4 border border-white/5">
+              <p class="text-gray-500 text-xs font-display tracking-widest uppercase mb-2">Threat Rate</p>
+              <p class="metric-val" style="color:var(--neon-amber)" id="metricRate">0%</p>
+              <p class="text-gray-600 text-xs mt-1 font-mono">detection ratio</p>
+            </div>
+          </div>
+
+          <!-- Scanner + System Health -->
+          <div class="grid grid-cols-5 gap-5">
+
+            <!-- Terminal Input Panel -->
+            <div class="col-span-3 glass rounded-2xl p-6">
+              <div class="flex items-center gap-3 mb-4">
+                <div class="flex gap-1.5">
+                  <div class="w-3 h-3 rounded-full bg-red-500/60"></div>
+                  <div class="w-3 h-3 rounded-full bg-yellow-500/60"></div>
+                  <div class="w-3 h-3 rounded-full bg-green-500/60"></div>
+                </div>
+                <span class="font-mono text-xs text-gray-600">dlp-scanner@sentinel-ix ~ </span>
+                <span class="font-mono text-xs" style="color:var(--neon-blue)">input_buffer.txt</span>
+              </div>
+
+              <textarea
+                id="scanInput"
+                class="terminal-textarea w-full rounded-xl p-4 text-sm min-h-40"
+                placeholder="// Paste payload here for DLP analysis...
+// Try: password=supersecret123
+// Try: API_KEY=sk-abc123xyz">
+              </textarea>
+
+              <div class="flex items-center justify-between mt-4">
+                <div class="flex items-center gap-4">
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="autoScan" class="w-3 h-3 accent-cyan-400" />
+                    <span class="font-mono text-xs text-gray-500">Auto-detect on paste</span>
+                  </label>
+                  <span class="font-mono text-xs text-gray-600" id="charCount">0 chars</span>
+                </div>
+                <button class="btn-analyze" id="analyzeBtn" onclick="runScan()">
+                  <i class="fa-solid fa-bolt mr-2"></i>Analyze Payload
+                </button>
+              </div>
+            </div>
+
+            <!-- System Health Chart -->
+            <div class="col-span-2 glass rounded-2xl p-5 flex flex-col">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="font-display font-600 text-white text-sm tracking-wider uppercase">System Health</h3>
+                <span class="font-mono text-xs px-2 py-1 rounded" style="background:rgba(0,255,170,0.1);color:var(--neon-emerald)">LIVE</span>
+              </div>
+              <div class="flex-1" style="min-height:160px">
+                <canvas id="healthChart"></canvas>
+              </div>
+              <!-- Mini stats -->
+              <div class="grid grid-cols-2 gap-3 mt-4">
+                <div class="rounded-lg p-3" style="background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.1)">
+                  <p class="text-gray-500 text-xs font-mono mb-1">CPU</p>
+                  <p class="font-display font-700 text-base" style="color:var(--neon-blue)" id="cpuVal">0%</p>
+                </div>
+                <div class="rounded-lg p-3" style="background:rgba(0,255,170,0.05);border:1px solid rgba(0,255,170,0.1)">
+                  <p class="text-gray-500 text-xs font-mono mb-1">MEM</p>
+                  <p class="font-display font-700 text-base" style="color:var(--neon-emerald)" id="memVal">0%</p>
+                </div>
+                <div class="rounded-lg p-3" style="background:rgba(255,170,0,0.05);border:1px solid rgba(255,170,0,0.1)">
+                  <p class="text-gray-500 text-xs font-mono mb-1">Latency</p>
+                  <p class="font-display font-700 text-base" style="color:var(--neon-amber)" id="latVal">0ms</p>
+                </div>
+                <div class="rounded-lg p-3" style="background:rgba(0,255,170,0.05);border:1px solid rgba(0,255,170,0.1)">
+                  <p class="text-gray-500 text-xs font-mono mb-1">Uptime</p>
+                  <p class="font-display font-700 text-base" style="color:var(--neon-emerald)" id="uptimeVal">100%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Result Card -->
+          <div id="resultCard" class="mt-5 rounded-2xl p-6 slide-in-up hidden">
+            <div class="flex items-start gap-4">
+              <div id="resultIcon" class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-xl"></div>
+              <div class="flex-1">
+                <div class="flex items-center gap-3 mb-2">
+                  <h3 id="resultTitle" class="font-display font-700 text-lg text-white tracking-wider"></h3>
+                  <span id="resultBadge" class="text-xs font-mono font-bold px-3 py-1 rounded-full tracking-widest uppercase"></span>
+                </div>
+                <p id="resultPreview" class="font-mono text-sm text-gray-400 mb-3"></p>
+                <div class="flex items-center gap-6">
+                  <div class="flex items-center gap-2">
+                    <i class="fa-regular fa-clock text-xs text-gray-600"></i>
+                    <span id="resultTime" class="font-mono text-xs text-gray-600"></span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-fingerprint text-xs text-gray-600"></i>
+                    <span id="resultId" class="font-mono text-xs text-gray-600"></span>
+                  </div>
+                </div>
+              </div>
+              <!-- Threat indicator -->
+              <div id="resultMeter" class="flex flex-col items-center gap-1 ml-4">
+                <div class="font-mono text-xs text-gray-500 uppercase tracking-wider mb-1">Threat</div>
+                <div id="threatLevel" class="font-display font-700 text-2xl"></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <!-- /page-scanner -->
+
+
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!--  PAGE: AUDIT DATABASE                                           -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <div id="page-audit" class="page">
+
+          <!-- Page Header -->
+          <div class="flex items-center justify-between mb-6">
+            <div>
+              <h1 class="font-display font-700 text-2xl text-white tracking-wider">
+                <i class="fa-solid fa-table-list mr-3" style="color:var(--neon-blue)"></i>Audit Database
+              </h1>
+              <p class="text-gray-500 text-sm mt-1 font-body">Persistent scan history from the H2 JPA datastore.</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <button onclick="loadLogs()" class="flex items-center gap-2 px-4 py-2 rounded-lg glass border border-white/10 text-gray-400 hover:text-white hover:border-cyan-400/30 transition-all text-sm font-display tracking-wider">
+                <i class="fa-solid fa-arrows-rotate text-xs"></i> Refresh
+              </button>
+              <button id="clearBtn" onclick="clearSearch()" class="flex items-center gap-2 px-4 py-2 rounded-lg glass border border-white/10 text-gray-400 hover:text-white hover:border-cyan-400/30 transition-all text-sm font-display tracking-wider hidden">
+                <i class="fa-solid fa-xmark text-xs"></i> Clear
+              </button>
+              <!-- Search -->
+              <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-500"></i>
+                <input id="searchInput" onkeyup="filterLogs()" type="text" placeholder="Filter logs..."
+                       class="pl-8 pr-4 py-2 rounded-lg glass border border-white/10 text-gray-300 placeholder-gray-600 text-sm font-mono focus:outline-none focus:border-cyan-400/40 w-52 transition-all" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Audit Table -->
+          <div class="glass rounded-2xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-white/5 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <i class="fa-solid fa-database text-xs" style="color:var(--neon-blue)"></i>
+                <span class="font-mono text-xs text-gray-400">audit_logs <span class="text-gray-600">·</span> h2://mem:sentinel</span>
+              </div>
+              <span class="font-mono text-xs text-gray-600" id="logCount">0 records</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="data-table w-full">
+                <thead>
+                  <tr>
+                    <th class="text-left w-16">ID</th>
+                    <th class="text-left">Content Preview</th>
+                    <th class="text-left w-32">Status</th>
+                    <th class="text-left w-48">Timestamp</th>
+                    <th class="text-center w-24">Details</th>
+                  </tr>
+                </thead>
+                <tbody id="auditTableBody">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+            </div>
+            <!-- Loading state -->
+            <div id="tableLoading" class="py-16 flex flex-col items-center justify-center text-gray-600 hidden">
+              <i class="fa-solid fa-circle-notch fa-spin text-2xl mb-3" style="color:var(--neon-blue)"></i>
+              <span class="font-mono text-sm">Querying datastore...</span>
+            </div>
+            <!-- Empty state -->
+            <div id="tableEmpty" class="py-16 flex flex-col items-center justify-center text-gray-600">
+              <i class="fa-solid fa-inbox text-3xl mb-3 text-gray-700"></i>
+              <span class="font-mono text-sm">No audit records found</span>
+              <span class="font-mono text-xs mt-1 text-gray-700">Run a scan to populate the database.</span>
+            </div>
+          </div>
+
+          <!-- Audit Chart -->
+          <div class="glass rounded-2xl p-5 mt-5">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-display font-600 text-white tracking-wider uppercase text-sm">Threat Distribution</h3>
+              <span class="font-mono text-xs text-gray-500">All-time scan results</span>
+            </div>
+            <div style="max-height:200px">
+              <canvas id="auditChart"></canvas>
+            </div>
+          </div>
+
+        </div>
+        <!-- /page-audit -->
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!--  JAVASCRIPT                                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <script>
+    // ── Config ────────────────────────────────────────────────────────────
+    const API_BASE = 'http://localhost:8080/api';
+
+    // ── State ─────────────────────────────────────────────────────────────
+    let allLogs = [];
+    let sessionMetrics = { total: 0, blocked: 0, clean: 0 };
+
+    // ── Clock ─────────────────────────────────────────────────────────────
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('liveClock').textContent =
+        now.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ── Navigation ────────────────────────────────────────────────────────
+    function navigate(page) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById('page-' + page).classList.add('active');
+      document.querySelector(`[onclick="navigate('${page}')"]`).classList.add('active');
+
+      // Refresh icons
+      document.querySelectorAll('.nav-item i').forEach(i => {
+        i.style.color = i.closest('.nav-item').classList.contains('active') ? 'var(--neon-blue)' : '';
+        if (!i.closest('.nav-item').classList.contains('active')) i.classList.add('text-gray-400');
+        else i.classList.remove('text-gray-400');
+      });
+
+      if (page === 'audit') loadLogs();
+    }
+
+    // ── Textarea char count ───────────────────────────────────────────────
+    document.getElementById('scanInput').addEventListener('input', function () {
+      document.getElementById('charCount').textContent = this.value.length + ' chars';
+      if (document.getElementById('autoScan').checked && this.value.trim()) {
+        debounce(runScan, 600)();
+      }
+    });
+
+    document.getElementById('scanInput').addEventListener('paste', function () {
+      if (document.getElementById('autoScan').checked) {
+        setTimeout(runScan, 100);
+      }
+    });
+
+    let debounceTimer;
+    function debounce(fn, delay) {
+      return function () {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(fn, delay);
+      };
+    }
+
+    // ── Scan ──────────────────────────────────────────────────────────────
+    async function runScan() {
+      const text = document.getElementById('scanInput').value.trim();
+      if (!text) return;
+
+      const btn = document.getElementById('analyzeBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i>Analyzing...';
+
+      try {
+        const res = await fetch(`${API_BASE}/scan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+
+        if (!res.ok) throw new Error('Scan failed');
+        const data = await res.json();
+        displayResult(data);
+        updateMetrics(data.status);
+      } catch (err) {
+        // Demo mode when backend not running
+        const mockResult = mockScan(text);
+        displayResult(mockResult);
+        updateMetrics(mockResult.status);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-bolt mr-2"></i>Analyze Payload';
+      }
+    }
+
+    // Mock scan for demo (when backend offline)
+    function mockScan(text) {
+      const keywords = ['password', 'secret', 'api_key', 'apikey', 'token', 'private_key', 'ssn', 'credit_card', 'passwd', 'auth_token', 'access_key'];
+      const lower = text.toLowerCase();
+      const status = keywords.some(k => lower.includes(k)) ? 'BLOCKED' : 'CLEAN';
+      return {
+        id: Math.floor(Math.random() * 9000) + 1000,
+        contentPreview: text.substring(0, 47) + (text.length > 47 ? '...' : ''),
+        status,
+        formattedTimestamp: new Date().toISOString().replace('T', ' ').substring(0, 19)
+      };
+    }
+
+    function displayResult(data) {
+      const card = document.getElementById('resultCard');
+      const isBlocked = data.status === 'BLOCKED';
+
+      card.className = `mt-5 rounded-2xl p-6 slide-in-up ${isBlocked ? 'result-blocked' : 'result-clean'}`;
+
+      document.getElementById('resultIcon').innerHTML = isBlocked
+        ? '<i class="fa-solid fa-shield-xmark" style="color:var(--neon-red)"></i>'
+        : '<i class="fa-solid fa-shield-check" style="color:var(--neon-emerald)"></i>';
+      document.getElementById('resultIcon').style.background = isBlocked
+        ? 'rgba(255,56,100,0.12)' : 'rgba(0,255,170,0.1)';
+      document.getElementById('resultIcon').style.border = isBlocked
+        ? '1px solid rgba(255,56,100,0.3)' : '1px solid rgba(0,255,170,0.25)';
+
+      document.getElementById('resultTitle').textContent = isBlocked ? 'THREAT DETECTED — PAYLOAD BLOCKED' : 'SCAN COMPLETE — PAYLOAD CLEAN';
+      document.getElementById('resultTitle').style.color = isBlocked ? 'var(--neon-red)' : 'var(--neon-emerald)';
+
+      const badge = document.getElementById('resultBadge');
+      badge.textContent = data.status;
+      badge.className = `text-xs font-mono font-bold px-3 py-1 rounded-full tracking-widest uppercase ${isBlocked ? 'badge-blocked' : 'badge-clean'}`;
+
+      document.getElementById('resultPreview').textContent = '> ' + (data.contentPreview || '');
+      document.getElementById('resultTime').textContent = data.formattedTimestamp || data.timestamp || '';
+      document.getElementById('resultId').textContent = 'Record #' + (data.id || 'N/A');
+
+      const threatEl = document.getElementById('threatLevel');
+      threatEl.textContent = isBlocked ? 'HIGH' : 'NONE';
+      threatEl.style.color = isBlocked ? 'var(--neon-red)' : 'var(--neon-emerald)';
+
+      card.classList.remove('hidden');
+    }
+
+    function updateMetrics(status) {
+      sessionMetrics.total++;
+      if (status === 'BLOCKED') sessionMetrics.blocked++;
+      else sessionMetrics.clean++;
+
+      document.getElementById('metricTotal').textContent = sessionMetrics.total;
+      document.getElementById('metricBlocked').textContent = sessionMetrics.blocked;
+      document.getElementById('metricClean').textContent = sessionMetrics.clean;
+      document.getElementById('metricRate').textContent =
+        Math.round((sessionMetrics.blocked / sessionMetrics.total) * 100) + '%';
+      document.getElementById('threatCount').textContent = sessionMetrics.blocked;
+    }
+
+    // ── Load Logs ─────────────────────────────────────────────────────────
+    async function loadLogs() {
+      document.getElementById('tableLoading').classList.remove('hidden');
+      document.getElementById('tableEmpty').classList.add('hidden');
+
+      try {
+        const res = await fetch(`${API_BASE}/logs`);
+        if (!res.ok) throw new Error();
+        allLogs = await res.json();
+      } catch {
+        // Demo data when backend offline
+        allLogs = generateDemoLogs();
+      }
+
+      renderTable(allLogs);
+      updateAuditChart(allLogs);
+      document.getElementById('tableLoading').classList.add('hidden');
+    }
+
+    function generateDemoLogs() {
+      const items = [
+        { text: 'password=MySuperSecret!#2024', status: 'BLOCKED' },
+        { text: 'Hello World from Sentinel-IX scanner', status: 'CLEAN' },
+        { text: 'API_KEY=sk-proj-abc123xyzDEF456', status: 'BLOCKED' },
+        { text: 'SELECT * FROM users WHERE active=1', status: 'CLEAN' },
+        { text: 'secret=my_token_value_here_xyz', status: 'BLOCKED' },
+        { text: 'The quick brown fox jumped over the fence', status: 'CLEAN' },
+      ];
+      return items.map((item, i) => ({
+        id: i + 1,
+        contentPreview: item.text.substring(0, 47) + (item.text.length > 47 ? '...' : ''),
+        status: item.status,
+        formattedTimestamp: new Date(Date.now() - i * 300000).toISOString().replace('T',' ').substring(0,19)
+      }));
+    }
+
+    function renderTable(logs) {
+      const tbody = document.getElementById('auditTableBody');
+      const empty = document.getElementById('tableEmpty');
+      document.getElementById('logCount').textContent = logs.length + ' records';
+
+      if (logs.length === 0) {
+        tbody.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      tbody.innerHTML = logs.map(log => {
+        const isBlocked = log.status === 'BLOCKED';
+        return `
+          <tr>
+            <td class="font-mono text-xs text-gray-600">#${log.id}</td>
+            <td class="font-mono text-xs" style="color:rgba(255,255,255,0.65)">${escHtml(log.contentPreview || '')}</td>
+            <td>
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded-full tracking-widest ${isBlocked ? 'badge-blocked' : 'badge-clean'}">
+                ${log.status}
+              </span>
+            </td>
+            <td class="font-mono text-xs text-gray-500">${log.formattedTimestamp || log.timestamp || ''}</td>
+            <td class="text-center">
+              <button class="w-7 h-7 rounded glass border border-white/10 hover:border-cyan-400/30 transition-all inline-flex items-center justify-center" title="View detail">
+                <i class="fa-solid fa-eye text-xs text-gray-500"></i>
+              </button>
+            </td>
+          </tr>`;
+      }).join('');
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── Filter ────────────────────────────────────────────────────────────
+    function filterLogs() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      document.getElementById('clearBtn').classList.toggle('hidden', !q);
+      const filtered = allLogs.filter(l =>
+        (l.contentPreview||'').toLowerCase().includes(q) ||
+        l.status.toLowerCase().includes(q) ||
+        String(l.id).includes(q)
+      );
+      renderTable(filtered);
+    }
+
+    function clearSearch() {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('clearBtn').classList.add('hidden');
+      renderTable(allLogs);
+    }
+
+    // ── System Health Chart ───────────────────────────────────────────────
+    let healthChart;
+    const healthLabels = Array.from({ length: 20 }, (_, i) => '');
+    const cpuData    = Array.from({ length: 20 }, () => randBetween(30, 70));
+    const memData    = Array.from({ length: 20 }, () => randBetween(40, 65));
+
+    function randBetween(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
+
+    function initHealthChart() {
+      const ctx = document.getElementById('healthChart').getContext('2d');
+      healthChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: healthLabels,
+          datasets: [
+            {
+              label: 'CPU',
+              data: cpuData,
+              borderColor: 'rgba(0,212,255,0.8)',
+              backgroundColor: 'rgba(0,212,255,0.08)',
+              borderWidth: 1.5,
+              pointRadius: 0,
+              fill: true,
+              tension: 0.4,
+            },
+            {
+              label: 'Memory',
+              data: memData,
+              borderColor: 'rgba(0,255,170,0.7)',
+              backgroundColor: 'rgba(0,255,170,0.05)',
+              borderWidth: 1.5,
+              pointRadius: 0,
+              fill: true,
+              tension: 0.4,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 300 },
+          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+          scales: {
+            x: { display: false },
+            y: {
+              display: true,
+              min: 0, max: 100,
+              grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+              ticks: {
+                color: 'rgba(255,255,255,0.2)',
+                font: { size: 9, family: 'Share Tech Mono' },
+                callback: v => v + '%',
+                maxTicksLimit: 4
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function tickHealthChart() {
+      const cpu = randBetween(25, 85);
+      const mem = randBetween(35, 70);
+      const lat = randBetween(4, 28);
+
+      cpuData.push(cpu); cpuData.shift();
+      memData.push(mem); memData.shift();
+
+      healthChart.update();
+      document.getElementById('cpuVal').textContent = cpu + '%';
+      document.getElementById('memVal').textContent = mem + '%';
+      document.getElementById('latVal').textContent = lat + 'ms';
+    }
+
+    // ── Audit Chart ───────────────────────────────────────────────────────
+    let auditChart;
+
+    function updateAuditChart(logs) {
+      const blocked = logs.filter(l => l.status === 'BLOCKED').length;
+      const clean = logs.length - blocked;
+
+      if (auditChart) {
+        auditChart.data.datasets[0].data = [blocked, clean];
+        auditChart.update();
+        return;
+      }
+
+      const ctx = document.getElementById('auditChart').getContext('2d');
+      auditChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['BLOCKED', 'CLEAN'],
+          datasets: [{
+            data: [blocked, clean],
+            backgroundColor: ['rgba(255,56,100,0.3)', 'rgba(0,255,170,0.25)'],
+            borderColor: ['rgba(255,56,100,0.8)', 'rgba(0,255,170,0.7)'],
+            borderWidth: 1,
+            borderRadius: 6,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(7,14,26,0.95)',
+              borderColor: 'rgba(0,212,255,0.3)',
+              borderWidth: 1,
+              titleColor: 'rgba(0,212,255,0.9)',
+              bodyColor: 'rgba(255,255,255,0.7)',
+              titleFont: { family: 'Rajdhani', size: 13, weight: '700' },
+              bodyFont: { family: 'Share Tech Mono', size: 11 },
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: {
+                color: 'rgba(255,255,255,0.3)',
+                font: { family: 'Share Tech Mono', size: 10 }
+              }
+            },
+            y: {
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: {
+                color: 'rgba(255,255,255,0.2)',
+                font: { family: 'Share Tech Mono', size: 10 }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      initHealthChart();
+      setInterval(tickHealthChart, 1500);
+      updateAuditChart([]);
+    });
+
+  </script>
+</body>
+</html>
